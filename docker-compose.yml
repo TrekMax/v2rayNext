@@ -1,0 +1,17 @@
+services:
+  v2ray:
+    build: .
+    container_name: v2rayNext
+    stdin_open: true
+    tty: true
+    network_mode: host          # v2ray 直接监听宿主机端口
+    volumes:
+      - v2ray-bin:/etc/v2ray/bin      # v2ray 二进制 (下载后持久化)
+      - v2ray-conf:/etc/v2ray/conf    # inbound 配置文件
+      - v2ray-log:/var/log/v2ray      # 日志
+    restart: unless-stopped
+
+volumes:
+  v2ray-bin:
+  v2ray-conf:
+  v2ray-log:

@@ -1,0 +1,46 @@
+#!/bin/bash
+# Mock systemctl for Docker environment (no systemd)
+# Manages v2ray process directly via nohup/pkill
+
+V2RAY_BIN=/etc/v2ray/bin/v2ray
+V2RAY_CONF=/etc/v2ray/config.json
+V2RAY_CONFDIR=/etc/v2ray/conf
+
+_v2ray_start() {
+    pkill -f "$V2RAY_BIN" 2>/dev/null
+    sleep 0.3
+    mkdir -p /var/log/v2ray
+    nohup "$V2RAY_BIN" run -config "$V2RAY_CONF" -confdir "$V2RAY_CONFDIR" \
+        >>/var/log/v2ray/access.log 2>>/var/log/v2ray/error.log &
+    sleep 0.5
+}
+
+case "$1" in
+    start)
+        [[ "$2" == *v2ray* ]] && _v2ray_start
+        ;;
+    stop)
+        [[ "$2" == *v2ray* ]] && pkill -f "$V2RAY_BIN" 2>/dev/null
+        ;;
+    restart)
+        [[ "$2" == *v2ray* ]] && _v2ray_start
+        ;;
+    status)
+        if [[ "$2" == *v2ray* ]]; then
+            if pgrep -f "$V2RAY_BIN" &>/dev/null; then
+                echo "● v2ray.service - V2Ray Service"
+                echo "   Active: active (running) since $(date)"
+            else
+                echo "● v2ray.service - V2Ray Service"
+                echo "   Active: inactive (dead)"
+            fi
+        fi
+        ;;
+    enable | disable | daemon-reload | is-enabled | is-active)
+        ;;  # noop
+    list-units)
+        ;;  # empty output — prevents caddy detection in init.sh
+    *)
+        exit 0
+        ;;
+esac
