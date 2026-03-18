@@ -11,6 +11,7 @@
 - 强大的快捷参数
 - 支持所有常用协议
 - 一键添加 Shadowsocks / VMess / VLESS / Trojan / Socks
+- 一键生成订阅链接，支持所有主流客户端导入
 - 一键启用 BBR、更改伪装网站、修改任意参数
 
 ## 安装
@@ -114,6 +115,24 @@ Usage: v2ray [options]... [args]...
 | VMess-mKCP-dynamic-port | 否 | 否 |
 | VMess-QUIC-dynamic-port | 否 | 否 |
 | Socks | 否 | 否 |
+
+## 订阅链接
+
+执行以下命令生成订阅内容：
+
+```bash
+v2ray sub
+```
+
+订阅文件保存在 `/etc/v2ray/sub.txt`，内容为所有代理配置 URL 的 base64 编码，可直接导入 V2RayN、Shadowrocket、Clash 等客户端。
+
+若需通过 HTTP 对外暴露，可用 Nginx 或 Caddy 静态托管该文件：
+
+```nginx
+location /sub {
+    alias /etc/v2ray/sub.txt;
+}
+```
 
 ## 反馈
 
