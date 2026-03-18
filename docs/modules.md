@@ -146,6 +146,23 @@ is_test()        # 输入校验: number / port / port_used / domain / path / uui
 #### `info(config_name)`
 显示配置详情: 协议、地址、端口、UUID/密码、URL、二维码。
 
+#### `sub()`
+生成订阅链接。遍历 `/etc/v2ray/conf/` 下所有 inbound 配置 (动态端口 link 文件除外), 收集各配置的代理 URL, 按行拼接后 base64 编码。结果保存至 `/etc/v2ray/sub.txt` 并打印到 stdout。
+
+不支持生成 URL 的协议 (如 Dokodemo-Door、HTTP) 自动跳过。
+
+**订阅文件格式** (`/etc/v2ray/sub.txt`):
+```
+base64(
+  vmess://...
+  ss://...
+  trojan://...
+  ...
+)
+```
+
+客户端 (V2RayN / Shadowrocket / Clash 等) 可直接导入订阅 URL 或订阅文件内容。若需通过 HTTP 对外暴露, 可用 Nginx/Caddy 静态托管 `/etc/v2ray/sub.txt`。
+
 #### `get(subcommand, ...args)`
 多功能内部函数:
 - `get file $name` — 查找配置文件
@@ -203,6 +220,7 @@ is_test()        # 输入校验: number / port / port_used / domain / path / uui
 | `c, change` | `change` | 修改配置 |
 | `d, del` | `del` | 删除配置 |
 | `i, info` | `info` | 查看配置 |
+| `sub, subscription` | `sub` | 生成订阅链接 |
 | `port/host/path/...` | `change` | 快捷修改 |
 | `s, status` | — | 查看服务状态 |
 | `start/stop/restart` | `manage` | 启停服务 |
