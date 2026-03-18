@@ -16,7 +16,7 @@
 ## 安装
 
 ```bash
-bash <(wget -qO- https://github.com/TrekMax/v2rayNext/raw/master/install.sh)
+bash <(wget -qO- https://github.com/TrekMax/v2rayNext/raw/main/install.sh)
 ```
 
 ## 帮助
