@@ -104,6 +104,9 @@ main() {
     url | qr)
         url_qr $@
         ;;
+    sub | subscription)
+        sub
+        ;;
     un | uninstall)
         uninstall
         ;;

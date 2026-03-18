@@ -1085,6 +1085,39 @@ url_qr() {
     fi
 }
 
+# generate subscription content (base64-encoded list of all proxy URLs)
+sub() {
+    readarray -t _sub_configs <<<"$(ls $is_conf_dir | grep -E -i '.json$' | sed '/dynamic-port-.*-link/d')"
+    [[ ! ${_sub_configs[*]} ]] && err "没有找到任何配置文件."
+
+    local sub_urls=()
+    local is_dont_auto_exit=1  # also suppresses info display (see line: dont show info)
+
+    for f in "${_sub_configs[@]}"; do
+        [[ ! $f ]] && continue
+        # reset all config variables before each parse
+        unset is_protocol port uuid trojan_password ss_method ss_password \
+              door_addr door_port is_dynamic_port is_socks_user is_socks_pass \
+              net is_reality path host header_type kcp_seed \
+              is_servername is_public_key is_private_key \
+              is_url is_config_file is_no_auto_tls is_tmp_https_port is_all_json
+        info $f
+        [[ $is_url ]] && sub_urls+=("$is_url")
+    done
+    unset _sub_configs
+
+    [[ ${#sub_urls[@]} -eq 0 ]] && err "没有可生成订阅的配置."
+
+    local sub_file=$is_core_dir/sub.txt
+    printf '%s\n' "${sub_urls[@]}" | base64 -w 0 >"$sub_file"
+
+    msg "\n------------- 订阅链接 (Subscription) -------------"
+    msg "配置数量: $(_green ${#sub_urls[@]})"
+    msg "订阅文件: $(_green $sub_file)\n"
+    printf '%s\n' "${sub_urls[@]}" | base64 -w 0
+    msg "\n------------- END -------------\n"
+}
+
 # update core, sh, caddy
 update() {
     case $1 in

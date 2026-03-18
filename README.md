@@ -41,6 +41,7 @@ Usage: v2ray [options]... [args]...
    i, info [name]                                  查看配置
    qr [name]                                       二维码信息
    url [name]                                      URL 信息
+   sub                                             生成订阅链接 (所有配置 base64)
    log                                             查看日志
    logerr                                          查看错误日志
 
