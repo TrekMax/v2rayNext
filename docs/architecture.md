@@ -21,7 +21,7 @@ v2ray/
 │   ├── bbr.sh            # TCP BBR 优化
 │   └── help.sh           # 帮助信息 & 关于
 └── .github/workflows/
-    └── release.yml       # CI: 打包 code.zip 并发布 GitHub Release
+    └── release.yml       # CI: 打包 V2rayNext_latest.zip 并发布 GitHub Release
 ```
 
 ## 分层架构

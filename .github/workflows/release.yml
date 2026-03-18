@@ -3,7 +3,7 @@ name: Main
 on:
   push:
     branches:
-      - master
+      - main
 
 permissions:
   contents: write
@@ -26,9 +26,9 @@ jobs:
       #     echo not found new version.
       #     exit 1
       - name: zip
-        run: zip -9vr code.zip . -x .\*
+        run: zip -9vr V2rayNext_latest.zip . -x .\*
       - name: release
         uses: softprops/action-gh-release@v2
         with:
-          files: code.zip
+          files: V2rayNext_latest.zip
           tag_name: ${{ env.is_sh_ver }}

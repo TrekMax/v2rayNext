@@ -3,7 +3,7 @@
 author=TrekMax
 
 # --- Bootstrap vars (needed before lib.sh is available) ---
-# These minimal definitions allow us to bootstrap the download of code.zip
+# These minimal definitions allow us to bootstrap the download of V2rayNext_latest.zip
 
 is_core=v2ray
 is_core_name=V2Ray
@@ -143,7 +143,7 @@ download() {
         is_ok=$is_core_ok
         ;;
     sh)
-        link=https://github.com/${is_sh_repo}/releases/latest/download/code.zip
+        link=https://github.com/${is_sh_repo}/releases/latest/download/V2rayNext_latest.zip
         name="$is_core_name 脚本"
         tmpfile=$tmpsh
         is_ok=$is_sh_ok

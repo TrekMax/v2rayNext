@@ -37,7 +37,7 @@ download() {
     sh)
         name="$is_core_name 脚本"
         tmpfile=$tmpdir/sh.zip
-        link="https://github.com/${is_sh_repo}/releases/download/${latest_ver}/code.zip"
+        link="https://github.com/${is_sh_repo}/releases/download/${latest_ver}/V2rayNext_latest.zip"
         download_file
         unzip -qo $tmpfile -d $is_sh_dir
         chmod +x $is_sh_bin
