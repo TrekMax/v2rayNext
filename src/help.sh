@@ -22,6 +22,7 @@ show_help() {
             "   i, info [name]                                  查看配置"
             "   qr [name]                                       二维码信息"
             "   url [name]                                      URL 信息"
+            "   sub [base64 | clash]                            生成订阅链接 / Clash 订阅"
             "   log                                             查看日志"
             "   logerr                                          查看错误日志\n"
             "更改:"

@@ -42,7 +42,7 @@ Usage: v2ray [options]... [args]...
    i, info [name]                                  查看配置
    qr [name]                                       二维码信息
    url [name]                                      URL 信息
-   sub                                             生成订阅链接 (所有配置 base64)
+   sub [base64 | clash]                            生成订阅链接 / Clash 订阅
    log                                             查看日志
    logerr                                          查看错误日志
 
@@ -126,11 +126,23 @@ v2ray sub
 
 订阅文件保存在 `/etc/v2ray/sub.txt`，内容为所有代理配置 URL 的 base64 编码，可直接导入 V2RayN、Shadowrocket、Clash 等客户端。
 
+如果需要直接生成 Clash YAML 订阅，可执行：
+
+```bash
+v2ray sub clash
+```
+
+生成结果保存在 `/etc/v2ray/sub-clash.yaml`。当前支持常见的 `VMess-TCP / VMess-WS-TLS / VMess-gRPC-TLS / VMess-H2-TLS / VLESS-WS-TLS / VLESS-gRPC-TLS / VLESS-H2-TLS / VLESS-Reality / Trojan-WS-TLS / Trojan-gRPC-TLS / Shadowsocks / Socks`，不支持的配置会自动跳过并给出提示。
+
 若需通过 HTTP 对外暴露，可用 Nginx 或 Caddy 静态托管该文件：
 
 ```nginx
 location /sub {
     alias /etc/v2ray/sub.txt;
+}
+
+location /sub-clash {
+    alias /etc/v2ray/sub-clash.yaml;
 }
 ```
 

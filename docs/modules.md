@@ -146,10 +146,14 @@ is_test()        # 输入校验: number / port / port_used / domain / path / uui
 #### `info(config_name)`
 显示配置详情: 协议、地址、端口、UUID/密码、URL、二维码。
 
-#### `sub()`
-生成订阅链接。遍历 `/etc/v2ray/conf/` 下所有 inbound 配置 (动态端口 link 文件除外), 收集各配置的代理 URL, 按行拼接后 base64 编码。结果保存至 `/etc/v2ray/sub.txt` 并打印到 stdout。
+#### `sub(mode)`
+生成订阅链接。遍历 `/etc/v2ray/conf/` 下所有 inbound 配置 (动态端口 link 文件除外), 按订阅格式输出。
 
-不支持生成 URL 的协议 (如 Dokodemo-Door、HTTP) 自动跳过。
+`mode` 可选:
+- `base64` (默认) — 收集各配置的代理 URL, 按行拼接后 base64 编码, 保存至 `/etc/v2ray/sub.txt`
+- `clash` — 生成 Clash YAML 订阅, 保存至 `/etc/v2ray/sub-clash.yaml`
+
+不支持当前订阅格式的协议会自动跳过并提示。例如 Dokodemo-Door、HTTP、mKCP、QUIC、动态端口配置不会出现在 Clash 订阅中。
 
 **订阅文件格式** (`/etc/v2ray/sub.txt`):
 ```
@@ -162,6 +166,28 @@ base64(
 ```
 
 客户端 (V2RayN / Shadowrocket / Clash 等) 可直接导入订阅 URL 或订阅文件内容。若需通过 HTTP 对外暴露, 可用 Nginx/Caddy 静态托管 `/etc/v2ray/sub.txt`。
+
+**Clash 订阅文件** (`/etc/v2ray/sub-clash.yaml`) 结构示意:
+```yaml
+port: 7890
+socks-port: 7891
+allow-lan: true
+mode: rule
+log-level: info
+proxies:
+  - name: 'example'
+    type: vmess
+    ...
+proxy-groups:
+  - name: Proxy
+    type: select
+    proxies:
+      - 'example'
+      - DIRECT
+rules:
+  - GEOIP,CN,DIRECT
+  - MATCH,Proxy
+```
 
 #### `get(subcommand, ...args)`
 多功能内部函数:
@@ -220,7 +246,7 @@ base64(
 | `c, change` | `change` | 修改配置 |
 | `d, del` | `del` | 删除配置 |
 | `i, info` | `info` | 查看配置 |
-| `sub, subscription` | `sub` | 生成订阅链接 |
+| `sub, subscription` | `sub` | 生成订阅链接 / Clash 订阅 |
 | `port/host/path/...` | `change` | 快捷修改 |
 | `s, status` | — | 查看服务状态 |
 | `start/stop/restart` | `manage` | 启停服务 |

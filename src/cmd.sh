@@ -105,7 +105,7 @@ main() {
         url_qr $@
         ;;
     sub | subscription)
-        sub
+        sub ${@:2}
         ;;
     un | uninstall)
         uninstall

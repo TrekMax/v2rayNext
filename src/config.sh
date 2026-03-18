@@ -1085,37 +1085,271 @@ url_qr() {
     fi
 }
 
-# generate subscription content (base64-encoded list of all proxy URLs)
-sub() {
+_yaml_quote() {
+    local _yaml_value=${1//\'/\'\'}
+    printf "'%s'" "$_yaml_value"
+}
+
+_sub_reset_info_vars() {
+    unset is_protocol port uuid trojan_password ss_method ss_password \
+          door_addr door_port is_dynamic_port is_dynamic_port_range \
+          is_socks_user is_socks_pass net is_reality path host header_type kcp_seed \
+          is_servername is_public_key is_private_key is_url is_config_file \
+          is_no_auto_tls is_tmp_https_port is_all_json is_trojan
+}
+
+_sub_clash_write_network_opts() {
+    local _sub_file=$1
+    case $net in
+    ws)
+        {
+            printf '    network: ws\n'
+            printf '    ws-opts:\n'
+            printf '      path: %s\n' "$(_yaml_quote "$path")"
+            printf '      headers:\n'
+            printf '        Host: %s\n' "$(_yaml_quote "${host:-$is_addr}")"
+        } >>"$_sub_file"
+        ;;
+    grpc)
+        {
+            printf '    network: grpc\n'
+            printf '    grpc-opts:\n'
+            printf '      grpc-service-name: %s\n' "$(_yaml_quote "$path")"
+        } >>"$_sub_file"
+        ;;
+    h2)
+        {
+            printf '    network: h2\n'
+            printf '    h2-opts:\n'
+            printf '      host:\n'
+            printf '        - %s\n' "$(_yaml_quote "${host:-$is_addr}")"
+            printf '      path: %s\n' "$(_yaml_quote "$path")"
+        } >>"$_sub_file"
+        ;;
+    esac
+}
+
+_sub_clash_write_proxy() {
+    local _sub_file=$1
+    local _proxy_name=${is_config_name%.json}
+    local _server=$is_addr
+    local _port=$port
+    local _skip_reason=
+
+    if [[ $is_dynamic_port ]]; then
+        _skip_reason='Clash 暂不支持动态端口配置'
+    fi
+
+    case $net in
+    door | http | kcp | quic)
+        _skip_reason="Clash 暂不支持 ${is_protocol}-${net}"
+        ;;
+    tcp)
+        [[ $is_protocol != 'vmess' ]] && _skip_reason="Clash 暂不支持 ${is_protocol}-tcp"
+        ;;
+    h2)
+        [[ $is_trojan ]] && _skip_reason='Clash 暂不支持 trojan-h2'
+        ;;
+    reality)
+        [[ $is_protocol != 'vless' ]] && _skip_reason="Clash 暂不支持 ${is_protocol}-reality"
+        ;;
+    esac
+
+    [[ $_skip_reason ]] && {
+        sub_clash_skipped+=("${is_config_name}: ${_skip_reason}")
+        return 1
+    }
+
+    if [[ $net == 'ws' || $net == 'grpc' || $net == 'h2' ]]; then
+        _server=${host:-$is_addr}
+        _port=$is_https_port
+    fi
+
+    case $is_protocol in
+    vmess)
+        {
+            printf '  - name: %s\n' "$(_yaml_quote "$_proxy_name")"
+            printf '    type: vmess\n'
+            printf '    server: %s\n' "$(_yaml_quote "$_server")"
+            printf '    port: %s\n' "$_port"
+            printf '    uuid: %s\n' "$(_yaml_quote "$uuid")"
+            printf '    alterId: 0\n'
+            printf '    cipher: auto\n'
+            printf '    udp: true\n'
+        } >>"$_sub_file"
+        if [[ $net == 'ws' || $net == 'grpc' || $net == 'h2' ]]; then
+            {
+                printf '    tls: true\n'
+                printf '    servername: %s\n' "$(_yaml_quote "${host:-$_server}")"
+            } >>"$_sub_file"
+            _sub_clash_write_network_opts "$_sub_file"
+        fi
+        ;;
+    vless)
+        {
+            printf '  - name: %s\n' "$(_yaml_quote "$_proxy_name")"
+            printf '    type: vless\n'
+            printf '    server: %s\n' "$(_yaml_quote "$_server")"
+            printf '    port: %s\n' "$_port"
+            printf '    uuid: %s\n' "$(_yaml_quote "$uuid")"
+            printf '    udp: true\n'
+        } >>"$_sub_file"
+        if [[ $net == 'reality' ]]; then
+            {
+                printf '    tls: true\n'
+                printf '    servername: %s\n' "$(_yaml_quote "$is_servername")"
+                printf '    flow: xtls-rprx-vision\n'
+                printf '    reality-opts:\n'
+                printf '      public-key: %s\n' "$(_yaml_quote "$is_public_key")"
+                printf "      short-id: ''\n"
+                printf '    client-fingerprint: ios\n'
+            } >>"$_sub_file"
+        else
+            {
+                printf '    tls: true\n'
+                printf '    servername: %s\n' "$(_yaml_quote "${host:-$_server}")"
+            } >>"$_sub_file"
+            _sub_clash_write_network_opts "$_sub_file"
+        fi
+        ;;
+    trojan)
+        {
+            printf '  - name: %s\n' "$(_yaml_quote "$_proxy_name")"
+            printf '    type: trojan\n'
+            printf '    server: %s\n' "$(_yaml_quote "$_server")"
+            printf '    port: %s\n' "$_port"
+            printf '    password: %s\n' "$(_yaml_quote "$trojan_password")"
+            printf '    udp: true\n'
+            printf '    sni: %s\n' "$(_yaml_quote "${host:-$_server}")"
+        } >>"$_sub_file"
+        _sub_clash_write_network_opts "$_sub_file"
+        ;;
+    shadowsocks)
+        {
+            printf '  - name: %s\n' "$(_yaml_quote "$_proxy_name")"
+            printf '    type: ss\n'
+            printf '    server: %s\n' "$(_yaml_quote "$_server")"
+            printf '    port: %s\n' "$_port"
+            printf '    cipher: %s\n' "$(_yaml_quote "$ss_method")"
+            printf '    password: %s\n' "$(_yaml_quote "$ss_password")"
+            printf '    udp: true\n'
+        } >>"$_sub_file"
+        ;;
+    socks)
+        {
+            printf '  - name: %s\n' "$(_yaml_quote "$_proxy_name")"
+            printf '    type: socks5\n'
+            printf '    server: %s\n' "$(_yaml_quote "$_server")"
+            printf '    port: %s\n' "$_port"
+            printf '    username: %s\n' "$(_yaml_quote "$is_socks_user")"
+            printf '    password: %s\n' "$(_yaml_quote "$is_socks_pass")"
+            printf '    udp: true\n'
+        } >>"$_sub_file"
+        ;;
+    *)
+        sub_clash_skipped+=("${is_config_name}: Clash 暂不支持 ${is_protocol}")
+        return 1
+        ;;
+    esac
+
+    sub_clash_names+=("$_proxy_name")
+}
+
+_sub_write_clash() {
+    local _sub_file=$1
+    local _sub_configs=()
+    local _f=
+    local _proxy_name=
+    local is_dont_auto_exit=1
+
+    {
+        printf 'port: 7890\n'
+        printf 'socks-port: 7891\n'
+        printf 'allow-lan: true\n'
+        printf 'mode: rule\n'
+        printf 'log-level: info\n'
+        printf '\n'
+        printf 'proxies:\n'
+    } >"$_sub_file"
+
     readarray -t _sub_configs <<<"$(ls $is_conf_dir | grep -E -i '.json$' | sed '/dynamic-port-.*-link/d')"
     [[ ! ${_sub_configs[*]} ]] && err "没有找到任何配置文件."
 
-    local sub_urls=()
-    local is_dont_auto_exit=1  # also suppresses info display (see line: dont show info)
+    sub_clash_names=()
+    sub_clash_skipped=()
 
-    for f in "${_sub_configs[@]}"; do
-        [[ ! $f ]] && continue
-        # reset all config variables before each parse
-        unset is_protocol port uuid trojan_password ss_method ss_password \
-              door_addr door_port is_dynamic_port is_socks_user is_socks_pass \
-              net is_reality path host header_type kcp_seed \
-              is_servername is_public_key is_private_key \
-              is_url is_config_file is_no_auto_tls is_tmp_https_port is_all_json
-        info $f
-        [[ $is_url ]] && sub_urls+=("$is_url")
+    for _f in "${_sub_configs[@]}"; do
+        [[ ! $_f ]] && continue
+        _sub_reset_info_vars
+        info "$_f"
+        _sub_clash_write_proxy "$_sub_file"
     done
-    unset _sub_configs
 
-    [[ ${#sub_urls[@]} -eq 0 ]] && err "没有可生成订阅的配置."
+    [[ ${#sub_clash_names[@]} -eq 0 ]] && err "没有可生成 Clash 订阅的配置."
 
-    local sub_file=$is_core_dir/sub.txt
-    printf '%s\n' "${sub_urls[@]}" | base64 -w 0 >"$sub_file"
+    {
+        printf '\nproxy-groups:\n'
+        printf '  - name: Proxy\n'
+        printf '    type: select\n'
+        printf '    proxies:\n'
+        for _proxy_name in "${sub_clash_names[@]}"; do
+            printf '      - %s\n' "$(_yaml_quote "$_proxy_name")"
+        done
+        printf '      - DIRECT\n'
+        printf '\n'
+        printf 'rules:\n'
+        printf '  - GEOIP,CN,DIRECT\n'
+        printf '  - MATCH,Proxy\n'
+    } >>"$_sub_file"
 
-    msg "\n------------- 订阅链接 (Subscription) -------------"
-    msg "配置数量: $(_green ${#sub_urls[@]})"
-    msg "订阅文件: $(_green $sub_file)\n"
-    printf '%s\n' "${sub_urls[@]}" | base64 -w 0
+    msg "\n------------- Clash 订阅 (Subscription) -------------"
+    msg "配置数量: $(_green ${#sub_clash_names[@]})"
+    msg "订阅文件: $(_green $_sub_file)"
+    [[ ${#sub_clash_skipped[@]} -gt 0 ]] && warn "以下配置已跳过:\n$(printf '%s\n' "${sub_clash_skipped[@]}")"
+    msg
+    cat "$_sub_file"
     msg "\n------------- END -------------\n"
+}
+
+# generate subscription content
+sub() {
+    local sub_mode=${1:-base64}
+    local _sub_configs=()
+
+    readarray -t _sub_configs <<<"$(ls $is_conf_dir | grep -E -i '.json$' | sed '/dynamic-port-.*-link/d')"
+    [[ ! ${_sub_configs[*]} ]] && err "没有找到任何配置文件."
+
+    case ${sub_mode,,} in
+    base64 | raw)
+        local sub_urls=()
+        local is_dont_auto_exit=1  # also suppresses info display (see line: dont show info)
+        local f=
+
+        for f in "${_sub_configs[@]}"; do
+            [[ ! $f ]] && continue
+            _sub_reset_info_vars
+            info "$f"
+            [[ $is_url ]] && sub_urls+=("$is_url")
+        done
+
+        [[ ${#sub_urls[@]} -eq 0 ]] && err "没有可生成订阅的配置."
+
+        local sub_file=$is_core_dir/sub.txt
+        printf '%s\n' "${sub_urls[@]}" | base64 -w 0 >"$sub_file"
+
+        msg "\n------------- 订阅链接 (Subscription) -------------"
+        msg "配置数量: $(_green ${#sub_urls[@]})"
+        msg "订阅文件: $(_green $sub_file)\n"
+        printf '%s\n' "${sub_urls[@]}" | base64 -w 0
+        msg "\n------------- END -------------\n"
+        ;;
+    clash | clash-meta | meta)
+        _sub_write_clash "$is_core_dir/sub-clash.yaml"
+        ;;
+    *)
+        err "无法识别订阅格式 ($sub_mode), 可选: base64, clash"
+        ;;
+    esac
 }
 
 # update core, sh, caddy
