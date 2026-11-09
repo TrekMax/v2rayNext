@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install script dependencies
 RUN apt-get update && apt-get install -y \
-        wget curl unzip jq qrencode net-tools iproute2 \
+        wget curl unzip jq qrencode net-tools iproute2 python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files into script directory

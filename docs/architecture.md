@@ -14,6 +14,8 @@ v2ray/
 │   ├── config.sh         # 配置 CRUD: add / change / del / info / get / create
 │   ├── cmd.sh            # 命令分发: main() 50+ 命令路由
 │   ├── service.sh        # 服务管理: manage / api / uninstall / install_service
+│   ├── subscription.sh   # 订阅命令、私有内容发布及服务初始化
+│   ├── subscription.py   # SQLite 授权管理、loopback HTTP 下载校验
 │   ├── download.sh       # 下载 & 更新组件
 │   ├── caddy.sh          # Caddy 反代 & 自动 TLS
 │   ├── log.sh            # 日志管理
@@ -91,7 +93,7 @@ init.sh
 ├── load service.sh
 ├── load config.sh
 ├── load cmd.sh
-└── main $args → cmd.sh:main()
+└── main "$@" → cmd.sh:main()，保留参数中的空格
 
 cmd.sh:main()
 ├── 无参数 → 显示交互式主菜单 (menu.sh)
@@ -123,9 +125,14 @@ load() {
 │   ├── v2ray                      # v2ray 二进制
 │   ├── geoip.dat
 │   └── geosite.dat
+├── subscription/                  # 0700 私有目录，不能静态托管
+│   ├── config.json                # HTTPS 公网 origin
+│   ├── tokens.sqlite3             # 授权摘要、有效期及撤销记录
+│   ├── sub.txt                    # Base64 内容，0600
+│   └── sub-clash.yaml             # Clash 内容，0600
 └── sh/                            # 脚本目录 (本仓库内容)
     ├── v2ray.sh
-    └── src/*.sh
+    └── src/                       # Shell 模块及 subscription.py
 
 /etc/caddy/                        # (可选, TLS 协议时安装)
 ├── Caddyfile
@@ -150,6 +157,10 @@ load() {
 | qrencode | 生成二维码 | 否 |
 | tar | 解压 caddy | TLS 时需要 |
 | openssl | 生成 SS2022 密码 | SS2022 时需要 |
+| Python 3.8+ / sqlite3 | 授权订阅服务 | 订阅时需要 |
+
+订阅下载链路为 `HTTPS Nginx/Caddy → 127.0.0.1:8787 → 校验授权 → 私有订阅文件`。
+systemd 单独管理 `v2ray-subscription.service`；Docker 的服务包装器按服务名精确分发，授权通过独立卷持久化。详见[订阅部署说明](subscription.md)。
 
 ## 网络依赖
 

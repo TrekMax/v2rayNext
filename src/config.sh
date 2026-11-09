@@ -780,10 +780,13 @@ get() {
         if [[ $is_config_file ]]; then
             is_json_str=$(cat $is_conf_dir/"$is_config_file")
             is_json_data_base=$(jq '.inbounds[0]|.protocol,.port,.settings.clients[0].id,.settings.clients[0].password,.settings.method,.settings.password,.settings.address,.settings.port,.settings.detour.to,.settings.accounts[0].user,.settings.accounts[0].pass' <<<$is_json_str)
-            [[ $? != 0 ]] && err "无法读取此文件: $is_config_file"
+            [[ $? != 0 ]] && { err "无法读取此文件: $is_config_file"; return 1; }
             is_json_data_more=$(jq '.inbounds[0]|.streamSettings|.network,.security,.tcpSettings.header.type,.kcpSettings.seed,.kcpSettings.header.type,.quicSettings.header.type,.wsSettings.path,.httpSettings.path,.grpcSettings.serviceName' <<<$is_json_str)
+            [[ $? != 0 ]] && { err "无法读取传输配置: $is_config_file"; return 1; }
             is_json_data_host=$(jq '.inbounds[0]|.streamSettings|.grpc_host,.wsSettings.headers.Host,.httpSettings.host[0]' <<<$is_json_str)
+            [[ $? != 0 ]] && { err "无法读取域名配置: $is_config_file"; return 1; }
             is_json_data_reality=$(jq '.inbounds[0]|.streamSettings|.realitySettings.serverNames[0],.realitySettings.publicKey,.realitySettings.privateKey' <<<$is_json_str)
+            [[ $? != 0 ]] && { err "无法读取 Reality 配置: $is_config_file"; return 1; }
             is_up_var_set=(null is_protocol port uuid trojan_password ss_method ss_password door_addr door_port is_dynamic_port is_socks_user is_socks_pass net is_reality tcp_type kcp_seed kcp_type quic_type ws_path h2_path grpc_path grpc_host ws_host h2_host is_servername is_public_key is_private_key)
             [[ $is_debug ]] && msg "\n------------- debug: $is_config_file -------------"
             i=0
@@ -936,7 +939,7 @@ get() {
 # show info
 info() {
     if [[ ! $is_protocol ]]; then
-        get info $1
+        get info "$1" || return 1
     fi
     is_color=44
     case $net in
@@ -1098,6 +1101,30 @@ _sub_reset_info_vars() {
           is_no_auto_tls is_tmp_https_port is_all_json is_trojan
 }
 
+_sub_load_info() {
+    local config_file=$1
+    if ! jq -e '
+        def nonempty: type == "string" and length > 0;
+        .inbounds[0] |
+        (type == "object") and (.protocol | nonempty) and (.port != null)
+        and (.settings | type == "object")
+        and (if .protocol == "vmess" or .protocol == "vless" then
+                .settings.clients[0].id | nonempty
+             elif .protocol == "trojan" then
+                .settings.clients[0].password | nonempty
+             elif .protocol == "shadowsocks" then
+                (.settings.method | nonempty) and (.settings.password | nonempty)
+             else true end)' \
+        "$is_conf_dir/$config_file" >/dev/null; then
+        warn "无法读取配置: $config_file" >&2
+        return 1
+    fi
+    _sub_reset_info_vars
+    # Select the exact file; get file otherwise interprets its name as a regex.
+    is_config_file=$config_file
+    info "$config_file"
+}
+
 _sub_clash_write_network_opts() {
     local _sub_file=$1
     case $net in
@@ -1108,14 +1135,14 @@ _sub_clash_write_network_opts() {
             printf '      path: %s\n' "$(_yaml_quote "$path")"
             printf '      headers:\n'
             printf '        Host: %s\n' "$(_yaml_quote "${host:-$is_addr}")"
-        } >>"$_sub_file"
+        } >>"$_sub_file" || return 2
         ;;
     grpc)
         {
             printf '    network: grpc\n'
             printf '    grpc-opts:\n'
             printf '      grpc-service-name: %s\n' "$(_yaml_quote "$path")"
-        } >>"$_sub_file"
+        } >>"$_sub_file" || return 2
         ;;
     h2)
         {
@@ -1124,7 +1151,7 @@ _sub_clash_write_network_opts() {
             printf '      host:\n'
             printf '        - %s\n' "$(_yaml_quote "${host:-$is_addr}")"
             printf '      path: %s\n' "$(_yaml_quote "$path")"
-        } >>"$_sub_file"
+        } >>"$_sub_file" || return 2
         ;;
     esac
 }
@@ -1176,13 +1203,13 @@ _sub_clash_write_proxy() {
             printf '    alterId: 0\n'
             printf '    cipher: auto\n'
             printf '    udp: true\n'
-        } >>"$_sub_file"
+        } >>"$_sub_file" || return 2
         if [[ $net == 'ws' || $net == 'grpc' || $net == 'h2' ]]; then
             {
                 printf '    tls: true\n'
                 printf '    servername: %s\n' "$(_yaml_quote "${host:-$_server}")"
-            } >>"$_sub_file"
-            _sub_clash_write_network_opts "$_sub_file"
+            } >>"$_sub_file" || return 2
+            _sub_clash_write_network_opts "$_sub_file" || return 2
         fi
         ;;
     vless)
@@ -1193,7 +1220,7 @@ _sub_clash_write_proxy() {
             printf '    port: %s\n' "$_port"
             printf '    uuid: %s\n' "$(_yaml_quote "$uuid")"
             printf '    udp: true\n'
-        } >>"$_sub_file"
+        } >>"$_sub_file" || return 2
         if [[ $net == 'reality' ]]; then
             {
                 printf '    tls: true\n'
@@ -1203,13 +1230,13 @@ _sub_clash_write_proxy() {
                 printf '      public-key: %s\n' "$(_yaml_quote "$is_public_key")"
                 printf "      short-id: ''\n"
                 printf '    client-fingerprint: ios\n'
-            } >>"$_sub_file"
+            } >>"$_sub_file" || return 2
         else
             {
                 printf '    tls: true\n'
                 printf '    servername: %s\n' "$(_yaml_quote "${host:-$_server}")"
-            } >>"$_sub_file"
-            _sub_clash_write_network_opts "$_sub_file"
+            } >>"$_sub_file" || return 2
+            _sub_clash_write_network_opts "$_sub_file" || return 2
         fi
         ;;
     trojan)
@@ -1221,8 +1248,8 @@ _sub_clash_write_proxy() {
             printf '    password: %s\n' "$(_yaml_quote "$trojan_password")"
             printf '    udp: true\n'
             printf '    sni: %s\n' "$(_yaml_quote "${host:-$_server}")"
-        } >>"$_sub_file"
-        _sub_clash_write_network_opts "$_sub_file"
+        } >>"$_sub_file" || return 2
+        _sub_clash_write_network_opts "$_sub_file" || return 2
         ;;
     shadowsocks)
         {
@@ -1233,7 +1260,7 @@ _sub_clash_write_proxy() {
             printf '    cipher: %s\n' "$(_yaml_quote "$ss_method")"
             printf '    password: %s\n' "$(_yaml_quote "$ss_password")"
             printf '    udp: true\n'
-        } >>"$_sub_file"
+        } >>"$_sub_file" || return 2
         ;;
     socks)
         {
@@ -1244,7 +1271,7 @@ _sub_clash_write_proxy() {
             printf '    username: %s\n' "$(_yaml_quote "$is_socks_user")"
             printf '    password: %s\n' "$(_yaml_quote "$is_socks_pass")"
             printf '    udp: true\n'
-        } >>"$_sub_file"
+        } >>"$_sub_file" || return 2
         ;;
     *)
         sub_clash_skipped+=("${is_config_name}: Clash 暂不支持 ${is_protocol}")
@@ -1273,19 +1300,20 @@ _sub_write_clash() {
     } >"$_sub_file"
 
     readarray -t _sub_configs <<<"$(ls $is_conf_dir | grep -E -i '.json$' | sed '/dynamic-port-.*-link/d')"
-    [[ ! ${_sub_configs[*]} ]] && err "没有找到任何配置文件."
+    [[ ! ${_sub_configs[*]} ]] && { warn "没有找到任何配置文件."; return 1; }
 
     sub_clash_names=()
     sub_clash_skipped=()
 
     for _f in "${_sub_configs[@]}"; do
         [[ ! $_f ]] && continue
-        _sub_reset_info_vars
-        info "$_f"
-        _sub_clash_write_proxy "$_sub_file"
+        _sub_load_info "$_f" || return 1
+        local proxy_result=0
+        _sub_clash_write_proxy "$_sub_file" || proxy_result=$?
+        [[ $proxy_result -le 1 ]] || return 1
     done
 
-    [[ ${#sub_clash_names[@]} -eq 0 ]] && err "没有可生成 Clash 订阅的配置."
+    [[ ${#sub_clash_names[@]} -eq 0 ]] && { warn "没有可生成 Clash 订阅的配置."; return 1; }
 
     {
         printf '\nproxy-groups:\n'
@@ -1302,22 +1330,24 @@ _sub_write_clash() {
         printf '  - MATCH,Proxy\n'
     } >>"$_sub_file"
 
-    msg "\n------------- Clash 订阅 (Subscription) -------------"
-    msg "配置数量: $(_green ${#sub_clash_names[@]})"
-    msg "订阅文件: $(_green $_sub_file)"
-    [[ ${#sub_clash_skipped[@]} -gt 0 ]] && warn "以下配置已跳过:\n$(printf '%s\n' "${sub_clash_skipped[@]}")"
-    msg
-    cat "$_sub_file"
-    msg "\n------------- END -------------\n"
+    [[ ${#sub_clash_skipped[@]} -gt 0 ]] && warn "以下配置已跳过:\n$(printf '%s\n' "${sub_clash_skipped[@]}")" >&2
+    return 0
 }
 
-# generate subscription content
+# Subscription commands are loaded only when requested.
 sub() {
-    local sub_mode=${1:-base64}
+    load subscription.sh
+    subscription_command "$@"
+}
+
+# Generate content into a caller-owned temporary file. Never publish anonymously.
+_sub_generate() {
+    local sub_mode=$1
+    local sub_file=$2
     local _sub_configs=()
 
     readarray -t _sub_configs <<<"$(ls $is_conf_dir | grep -E -i '.json$' | sed '/dynamic-port-.*-link/d')"
-    [[ ! ${_sub_configs[*]} ]] && err "没有找到任何配置文件."
+    [[ ! ${_sub_configs[*]} ]] && { warn "没有找到任何配置文件."; return 1; }
 
     case ${sub_mode,,} in
     base64 | raw)
@@ -1327,27 +1357,20 @@ sub() {
 
         for f in "${_sub_configs[@]}"; do
             [[ ! $f ]] && continue
-            _sub_reset_info_vars
-            info "$f"
+            _sub_load_info "$f" || return 1
             [[ $is_url ]] && sub_urls+=("$is_url")
         done
 
-        [[ ${#sub_urls[@]} -eq 0 ]] && err "没有可生成订阅的配置."
+        [[ ${#sub_urls[@]} -eq 0 ]] && { warn "没有可生成订阅的配置."; return 1; }
 
-        local sub_file=$is_core_dir/sub.txt
         printf '%s\n' "${sub_urls[@]}" | base64 -w 0 >"$sub_file"
-
-        msg "\n------------- 订阅链接 (Subscription) -------------"
-        msg "配置数量: $(_green ${#sub_urls[@]})"
-        msg "订阅文件: $(_green $sub_file)\n"
-        printf '%s\n' "${sub_urls[@]}" | base64 -w 0
-        msg "\n------------- END -------------\n"
         ;;
     clash | clash-meta | meta)
-        _sub_write_clash "$is_core_dir/sub-clash.yaml"
+        _sub_write_clash "$sub_file"
         ;;
     *)
-        err "无法识别订阅格式 ($sub_mode), 可选: base64, clash"
+        warn "无法识别订阅格式 ($sub_mode), 可选: base64, clash"
+        return 1
         ;;
     esac
 }
@@ -1395,7 +1418,7 @@ update() {
         msg "\n发现 $is_show_name 新版本: $(_green $latest_ver)\n"
         is_new_ver=$latest_ver
     fi
-    download $is_update_name $is_new_ver
+    download $is_update_name $is_new_ver || return 1
     msg "更新成功, 当前 $is_show_name 版本: $(_green $is_new_ver)\n"
     msg "$(_green 请查看更新说明: https://github.com/$is_update_repo/releases/tag/$is_new_ver)\n"
     [[ $is_update_name == 'core' ]] && $is_core restart

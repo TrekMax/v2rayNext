@@ -2,6 +2,14 @@
 # Mock systemctl for Docker environment (no systemd)
 # Manages v2ray process directly via nohup/pkill
 
+# Exact service dispatch prevents subscription operations from matching *v2ray* below.
+for service_arg in "${@:2}"; do
+    if [[ $service_arg == v2ray-subscription || $service_arg == v2ray-subscription.service ]]; then
+        subscription_scripts=${V2RAY_SCRIPT_DIR:-${V2RAY_ROOT:-/etc/v2ray}/sh}
+        exec /bin/bash "$subscription_scripts/docker/subscription-service" "$@"
+    fi
+done
+
 V2RAY_BIN=/etc/v2ray/bin/v2ray
 V2RAY_CONF=/etc/v2ray/config.json
 V2RAY_CONFDIR=/etc/v2ray/conf

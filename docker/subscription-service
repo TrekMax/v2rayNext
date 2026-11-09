@@ -1,0 +1,73 @@
+#!/bin/bash
+# Lifecycle adapter for the subscription process in containers without systemd.
+umask 077
+subscription_root=${V2RAY_ROOT:-/etc/v2ray}
+subscription_scripts=${V2RAY_SCRIPT_DIR:-$subscription_root/sh}
+subscription_state=$subscription_root/subscription
+subscription_script=$subscription_scripts/src/subscription.py
+subscription_pid_file=$subscription_state/service.pid
+
+subscription_running() {
+    [[ -f $subscription_pid_file ]] || return 1
+    read -r subscription_pid <"$subscription_pid_file"
+    [[ $subscription_pid =~ ^[1-9][0-9]*$ ]] || return 1
+    kill -0 "$subscription_pid" 2>/dev/null || return 1
+    local process_args
+    process_args=$(ps -p "$subscription_pid" -o args= 2>/dev/null)
+    [[ $process_args == *"$subscription_script --state-dir $subscription_state serve"* ]]
+}
+
+subscription_stop() {
+    if subscription_running; then
+        kill "$subscription_pid" || return 1
+        for ((attempt = 0; attempt < 30; attempt++)); do
+            subscription_running || break
+            sleep 0.1
+        done
+        if subscription_running; then
+            printf '%s\n' '订阅服务停止超时' >&2
+            return 1
+        fi
+    fi
+    rm -f -- "$subscription_pid_file"
+}
+
+subscription_start() {
+    subscription_running && return 0
+    [[ -f $subscription_state/config.json ]] || {
+        printf '%s\n' '请先执行 v2ray sub setup' >&2
+        return 1
+    }
+    nohup python3 -B "$subscription_script" --state-dir "$subscription_state" serve \
+        >>"$subscription_state/service.log" 2>&1 </dev/null &
+    local started_pid=$!
+    printf '%s\n' "$started_pid" >"$subscription_pid_file"
+    sleep 0.3
+    subscription_running || {
+        rm -f -- "$subscription_pid_file"
+        printf '%s\n' "订阅服务启动失败，请检查 $subscription_state/service.log" >&2
+        return 1
+    }
+}
+
+case $1 in
+start) subscription_start ;;
+stop) subscription_stop ;;
+restart) subscription_stop && subscription_start ;;
+enable)
+    [[ -f $subscription_state/config.json ]] || exit 1
+    touch "$subscription_state/enabled"
+    ;;
+disable) rm -f -- "$subscription_state/enabled" ;;
+is-enabled) [[ -f $subscription_state/enabled ]] ;;
+is-active) subscription_running ;;
+status)
+    if subscription_running; then
+        printf 'v2ray-subscription: active (PID %s)\n' "$subscription_pid"
+    else
+        printf '%s\n' 'v2ray-subscription: inactive'
+        exit 3
+    fi
+    ;;
+*) printf '%s\n' '不支持的订阅服务操作' >&2; exit 1 ;;
+esac

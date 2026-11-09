@@ -2,6 +2,35 @@
 
 # --- systemd service installation ---
 
+install_subscription_service() {
+    local unit_dir=${is_systemd_dir:-/lib/systemd/system}
+    local python_bin
+    python_bin=$(command -v python3) || return 1
+    cat >"$unit_dir/v2ray-subscription.service" <<EOF
+[Unit]
+Description=V2Ray Subscription Gateway
+After=network.target
+
+[Service]
+Type=simple
+User=root
+UMask=0077
+ExecStart="$python_bin" -B "$is_sh_dir/src/subscription.py" --state-dir "$is_core_dir/subscription" serve
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_INET AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    [[ $? -eq 0 ]] || return 1
+    systemctl daemon-reload && systemctl enable v2ray-subscription.service
+}
+
 install_service() {
     case $1 in
     xray | v2ray)
@@ -167,6 +196,12 @@ uninstall() {
     fi
     manage stop &>/dev/null
     manage disable &>/dev/null
+    if [[ -f $is_core_dir/subscription/config.json ]]; then
+        systemctl stop v2ray-subscription.service || return 1
+        systemctl disable v2ray-subscription.service || return 1
+        rm -f /lib/systemd/system/v2ray-subscription.service
+        systemctl daemon-reload
+    fi
     rm -rf $is_core_dir $is_log_dir $is_sh_bin /lib/systemd/system/$is_core.service
     sed -i "/$is_core/d" /root/.bashrc
     # uninstall caddy; 2 is ask result

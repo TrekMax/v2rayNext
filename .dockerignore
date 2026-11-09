@@ -2,3 +2,10 @@
 .github
 docs
 *.md
+!docs
+docs/*
+!docs/subscription.md
+!docs/subscription-format.md
+tests
+**/__pycache__
+**/*.pyc

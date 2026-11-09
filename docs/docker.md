@@ -10,7 +10,8 @@
 Dockerfile             # 镜像定义
 docker-compose.yml     # Compose 部署配置
 docker/
-├── systemctl          # systemctl mock，管理 v2ray 进程
+├── systemctl          # systemctl mock，按服务名分发
+├── subscription-service # 独立管理订阅进程、PID 与启用状态
 └── entrypoint.sh      # 容器入口：下载二进制、创建 service 骨架、启动 v2ray
 ```
 
@@ -37,6 +38,7 @@ docker run -it --rm \
   --network host \
   -v v2ray-bin:/etc/v2ray/bin \
   -v v2ray-conf:/etc/v2ray/conf \
+  -v v2ray-subscription:/etc/v2ray/subscription \
   v2raynext
 ```
 
@@ -70,6 +72,9 @@ v2ray del <config-name>
 - **非 TLS 协议均可测试**：VMess-TCP / VMess-mKCP / VMess-QUIC / Shadowsocks / Socks 等
 - **network_mode: host**：容器直接使用宿主机网络，v2ray 监听的端口在宿主机上可以直接访问
 - **二进制持久化**：`v2ray-bin` volume 保存已下载的 v2ray 二进制，重建容器无需重新下载
+- **订阅持久化**：`v2ray-subscription` 保存授权、内容和启用状态，容器重启后恢复已启用的订阅服务
+- **订阅 HTTPS**：服务只监听 `127.0.0.1:8787`，Linux host 网络下可由宿主机 Nginx/Caddy 反代；详见[订阅部署说明](subscription.md)
+- **旧镜像升级**：推荐重建镜像以安装 Python 依赖。仅更新脚本时，需先安装 Python 3.8+；`sub setup` 会刷新本项目的 systemctl 包装器和 `/entrypoint.sh`，避免旧包装器误操作核心服务。重建容器仍需基于新镜像，并保留订阅卷
 
 ## 排查问题
 

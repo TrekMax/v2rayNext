@@ -146,16 +146,18 @@ is_test()        # 输入校验: number / port / port_used / domain / path / uui
 #### `info(config_name)`
 显示配置详情: 协议、地址、端口、UUID/密码、URL、二维码。
 
-#### `sub(mode)`
-生成订阅链接。遍历 `/etc/v2ray/conf/` 下所有 inbound 配置 (动态端口 link 文件除外), 按订阅格式输出。
+#### `sub(args...)`
+按需加载 `src/subscription.sh`，分发 setup、签发、refresh、list、revoke 和服务管理命令。详情见[订阅授权与部署](subscription.md)。
+
+`_sub_generate(mode, file)` 遍历 `/etc/v2ray/conf/` 下所有 inbound 配置 (动态端口 link 文件除外)，写入调用方提供的私有临时文件，成功后原子替换正式内容，再签发授权。
 
 `mode` 可选:
-- `base64` (默认) — 收集各配置的代理 URL, 按行拼接后 base64 编码, 保存至 `/etc/v2ray/sub.txt`
-- `clash` — 生成 Clash YAML 订阅, 保存至 `/etc/v2ray/sub-clash.yaml`
+- `base64` (默认) — 收集各配置的代理 URL, 按行拼接后 base64 编码, 保存至 `/etc/v2ray/subscription/sub.txt`
+- `clash` — 生成 Clash YAML 订阅, 保存至 `/etc/v2ray/subscription/sub-clash.yaml`
 
 不支持当前订阅格式的协议会自动跳过并提示。例如 Dokodemo-Door、HTTP、mKCP、QUIC、动态端口配置不会出现在 Clash 订阅中。
 
-**订阅文件格式** (`/etc/v2ray/sub.txt`):
+**订阅文件格式** (`/etc/v2ray/subscription/sub.txt`):
 ```
 base64(
   vmess://...
@@ -165,9 +167,9 @@ base64(
 )
 ```
 
-客户端 (V2RayN / Shadowrocket / Clash 等) 可直接导入订阅 URL 或订阅文件内容。若需通过 HTTP 对外暴露, 可用 Nginx/Caddy 静态托管 `/etc/v2ray/sub.txt`。
+客户端通过带 token 的 HTTPS URL 导入。Nginx/Caddy 反向代理到 `127.0.0.1:8787`，Python 服务每次请求验证格式、到期与撤销状态。禁止静态托管私有内容；旧匿名输出在 setup 时删除。
 
-**Clash 订阅文件** (`/etc/v2ray/sub-clash.yaml`) 结构示意:
+**Clash 订阅文件** (`/etc/v2ray/subscription/sub-clash.yaml`) 结构示意:
 ```yaml
 port: 7890
 socks-port: 7891
@@ -246,7 +248,7 @@ rules:
 | `c, change` | `change` | 修改配置 |
 | `d, del` | `del` | 删除配置 |
 | `i, info` | `info` | 查看配置 |
-| `sub, subscription` | `sub` | 生成订阅链接 / Clash 订阅 |
+| `sub, subscription` | `sub` | 订阅授权、更新内容、撤销及服务管理 |
 | `port/host/path/...` | `change` | 快捷修改 |
 | `s, status` | — | 查看服务状态 |
 | `start/stop/restart` | `manage` | 启停服务 |

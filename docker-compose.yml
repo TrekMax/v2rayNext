@@ -9,9 +9,11 @@ services:
       - v2ray-bin:/etc/v2ray/bin      # v2ray 二进制 (下载后持久化)
       - v2ray-conf:/etc/v2ray/conf    # inbound 配置文件
       - v2ray-log:/var/log/v2ray      # 日志
+      - v2ray-subscription:/etc/v2ray/subscription # 订阅授权、内容和启用状态
     restart: unless-stopped
 
 volumes:
   v2ray-bin:
   v2ray-conf:
   v2ray-log:
+  v2ray-subscription:

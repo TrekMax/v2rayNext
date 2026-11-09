@@ -11,7 +11,7 @@
 - 强大的快捷参数
 - 支持所有常用协议
 - 一键添加 Shadowsocks / VMess / VLESS / Trojan / Socks
-- 一键生成订阅链接，支持所有主流客户端导入
+- 生成 Base64 / Clash 订阅，支持独立授权、有效期和单条撤销
 - 一键启用 BBR、更改伪装网站、修改任意参数
 
 ## 安装
@@ -42,7 +42,11 @@ Usage: v2ray [options]... [args]...
    i, info [name]                                  查看配置
    qr [name]                                       二维码信息
    url [name]                                      URL 信息
-   sub [base64 | clash]                            生成订阅链接 / Clash 订阅
+   sub [base64 | clash] [--ttl 7d] [--name 名称]    生成有期限的授权订阅链接
+   sub setup <https://域名>                        初始化订阅服务
+   sub refresh [base64 | clash]                    更新订阅内容
+   sub list / revoke <id>                         查看 / 撤销授权
+   sub start / stop / restart / status            管理订阅服务
    log                                             查看日志
    logerr                                          查看错误日志
 
@@ -118,33 +122,26 @@ Usage: v2ray [options]... [args]...
 
 ## 订阅链接
 
-执行以下命令生成订阅内容：
+订阅地址与节点内容的具体结构见[订阅与节点格式](docs/subscription-format.md)。
+
+订阅需要 Python 3.8+（含 sqlite3）和 HTTPS 反向代理。先初始化服务并按[订阅部署说明](docs/subscription.md)配置 Nginx 或 Caddy：
 
 ```bash
-v2ray sub
+v2ray sub setup https://sub.example.com
 ```
 
-订阅文件保存在 `/etc/v2ray/sub.txt`，内容为所有代理配置 URL 的 base64 编码，可直接导入 V2RayN、Shadowrocket、Clash 等客户端。
-
-如果需要直接生成 Clash YAML 订阅，可执行：
+再创建链接，导入相应客户端：
 
 ```bash
-v2ray sub clash
+v2ray sub --ttl 7d --name phone
+v2ray sub clash --ttl 30d --name desktop
+v2ray sub list
+v2ray sub revoke <授权ID>
 ```
 
-生成结果保存在 `/etc/v2ray/sub-clash.yaml`。当前支持常见的 `VMess-TCP / VMess-WS-TLS / VMess-gRPC-TLS / VMess-H2-TLS / VLESS-WS-TLS / VLESS-gRPC-TLS / VLESS-H2-TLS / VLESS-Reality / Trojan-WS-TLS / Trojan-gRPC-TLS / Shadowsocks / Socks`，不支持的配置会自动跳过并给出提示。
+默认有效 7 天，支持 `s/m/h/d`，最长 365 天。授权码只在创建时显示，过期或撤销后禁止下载；完整链接在有效期内仍可被转发使用，已下载的节点配置不会被撤回。
 
-若需通过 HTTP 对外暴露，可用 Nginx 或 Caddy 静态托管该文件：
-
-```nginx
-location /sub {
-    alias /etc/v2ray/sub.txt;
-}
-
-location /sub-clash {
-    alias /etc/v2ray/sub-clash.yaml;
-}
-```
+**升级不兼容旧匿名链接。** setup 会删除旧的两个订阅文件；还需删除 Web 服务器中的旧静态入口、其他副本及缓存。新内容保存在 `/etc/v2ray/subscription/` 私有目录，不能静态托管。节点变化后执行 `v2ray sub refresh base64` 或 `v2ray sub refresh clash` 更新内容。
 
 ## 反馈
 

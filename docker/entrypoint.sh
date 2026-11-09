@@ -45,4 +45,9 @@ if [[ -f /etc/v2ray/config.json ]]; then
     echo ">>> v2ray started (PID: $(pgrep -f "$V2RAY_BIN" | head -1))"
 fi
 
+# Restore subscription service only when previously enabled. Its state has its own volume.
+if systemctl is-enabled --quiet v2ray-subscription.service; then
+    systemctl start v2ray-subscription.service
+fi
+
 exec "$@"

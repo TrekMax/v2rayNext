@@ -259,6 +259,7 @@ build_protocol_json() {
         ;;
     *)
         err "无法识别协议: $is_config_file"
+        return 1
         ;;
     esac
     [[ $net ]] && return # if net exist, dont need more json args
@@ -286,6 +287,7 @@ build_protocol_json() {
         ;;
     *)
         err "无法识别传输协议: $is_config_file"
+        return 1
         ;;
     esac
 }

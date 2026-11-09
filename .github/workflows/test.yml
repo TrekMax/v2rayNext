@@ -1,0 +1,27 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  subscription:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install test dependencies
+        run: sudo apt-get update && sudo apt-get install -y python3 jq shellcheck
+      - name: Subscription integration tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Shell syntax and focused lint
+        run: |
+          for file in v2ray.sh src/*.sh docker/entrypoint.sh docker/systemctl docker/subscription-service; do
+            bash -n "$file"
+          done
+          shellcheck -S warning src/subscription.sh docker/subscription-service docker/systemctl docker/entrypoint.sh
+      - name: Diff whitespace
+        run: git diff --check

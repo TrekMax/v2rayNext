@@ -63,5 +63,5 @@ load service.sh
 load config.sh
 load cmd.sh
 
-[[ ! $args ]] && args=main
-main $args
+[[ $# -eq 0 ]] && set -- main
+main "$@"
