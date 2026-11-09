@@ -11,43 +11,6 @@ BASH = os.environ.get('V2RAY_TEST_BASH', 'bash')
 
 
 class ServiceTest(unittest.TestCase):
-    def test_setup_upgrades_legacy_container_adapter_before_service_operations(self):
-        with tempfile.TemporaryDirectory() as directory:
-            core = Path(directory)
-            binaries = core / 'bin'
-            binaries.mkdir()
-            manager = binaries / 'systemctl'
-            manager.write_text('#!/bin/bash\n# Mock systemctl for Docker environment (no systemd)\n'
-                               'echo legacy-core-operation >> "$V2RAY_ROOT/legacy-called"\nexit 0\n')
-            manager.chmod(0o755)
-            entrypoint = core / 'entrypoint.sh'
-            entrypoint.write_text('# old container entrypoint\n')
-            env = dict(os.environ, PATH=str(binaries) + os.pathsep + os.environ['PATH'],
-                       V2RAY_ROOT=str(core), V2RAY_SCRIPT_DIR=str(ROOT))
-            harness = r'''
-is_sh_dir=$1
-is_core_dir=$2
-is_systemd_dir=$is_core_dir/units
-is_container_entrypoint=$is_core_dir/entrypoint.sh
-mkdir -p "$is_systemd_dir"
-load() { . "$is_sh_dir/src/$1"; }
-msg() { :; }
-warn() { printf '%s\n' "$*" >&2; }
-load subscription.sh
-subscription_command setup https://sub.example.com
-'''
-            try:
-                result = subprocess.run([BASH, '-c', harness, 'test', str(ROOT), str(core)],
-                                        env=env, capture_output=True, text=True, timeout=10)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertFalse((core / 'legacy-called').exists())
-                self.assertTrue((core / 'subscription/enabled').exists())
-                self.assertTrue((core / 'subscription/service.pid').exists())
-                self.assertEqual(entrypoint.read_bytes(), (ROOT / 'docker/entrypoint.sh').read_bytes())
-            finally:
-                subprocess.run([str(manager), 'stop', 'v2ray-subscription.service'],
-                               env=env, capture_output=True, timeout=10)
-
     def test_systemd_setup_generates_unit_and_removes_old_outputs(self):
         with tempfile.TemporaryDirectory() as directory:
             core = Path(directory) / 'core'

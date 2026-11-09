@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install script dependencies
 RUN apt-get update && apt-get install -y \
-        wget curl unzip jq qrencode net-tools iproute2 python3 \
+        ca-certificates wget curl unzip jq qrencode net-tools iproute2 python3 procps openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files into script directory
@@ -26,4 +26,6 @@ RUN install -m 0755 /etc/v2ray/sh/docker/entrypoint.sh /entrypoint.sh
 EXPOSE 1080 2333 10000-10010
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["/bin/bash"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5m --retries=3 \
+    CMD ["/bin/bash", "/etc/v2ray/sh/docker/healthcheck"]
+CMD ["serve"]

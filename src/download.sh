@@ -42,8 +42,6 @@ download() {
         unzip -qo $tmpfile -d $is_sh_dir
         chmod +x $is_sh_bin
         if [[ -f $is_core_dir/subscription/config.json ]]; then
-            load subscription.sh
-            subscription_prepare_container || return 1
             if systemctl is-enabled --quiet v2ray-subscription.service; then
                 systemctl restart v2ray-subscription.service || {
                     warn "脚本已更新，但订阅服务重启失败，请检查 v2ray sub status"

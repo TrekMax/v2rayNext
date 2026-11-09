@@ -138,6 +138,8 @@ stop 仅停止服务，不取消开机启动。Linux 可用 `systemctl disable v
 
 Compose 已添加 `v2ray-subscription` 卷。自行 docker run 时添加 `-v v2ray-subscription:/etc/v2ray/subscription`。Linux `--network host` 下，宿主机 Nginx/Caddy 可以连接服务的 loopback；其他网络方式需要将反向代理放在同一网络命名空间。不要将后端改成公网监听。
 
+后台启动使用 `docker compose up -d --build`，再通过 `docker compose exec v2ray v2ray sub setup https://sub.example.com` 初始化。主配置另存于 `v2ray-state` 卷，完整步骤见 [Docker 部署](docker.md)。
+
 ## 验证与故障排查
 
 ```bash
@@ -158,19 +160,19 @@ Docker 服务日志在 `/etc/v2ray/subscription/service.log`，不记录 URL。�
 
 ```bash
 python3 -m unittest discover -s tests -v
-for file in v2ray.sh src/*.sh docker/entrypoint.sh docker/systemctl docker/subscription-service; do
+for file in v2ray.sh src/*.sh docker/*; do
     bash -n "$file"
 done
-shellcheck -S warning src/subscription.sh docker/subscription-service docker/systemctl docker/entrypoint.sh
+shellcheck -S warning src/subscription.sh docker/*
 git diff --check
 ```
 
 生成集成测试需要 Bash 4+、jq、GNU base64；macOS 可通过 `V2RAY_TEST_BASH=/path/to/bash` 指定 Bash，通过已安装的 `gbase64` 使用 GNU 行为。真实公网 HTTPS 和客户端导入需要在目标服务器单独验收。
 
-### 本次本地验证（2026-11-09）
+### 订阅功能初次验证（2026-11-09）
 
 - macOS arm64、Python 3.15.2、临时构建的 Bash 5.3.0：24 项自动化测试通过，包含真实回环 HTTP、SQLite、订阅生成和独立进程启停。
-- 覆盖非法 JSON、合法 JSON 的错误结构、未知协议/传输导致的发布失败，以及旧 Docker 包装器升级；失败时保留已有内容且不新增授权。
+- 覆盖非法 JSON、合法 JSON 的错误结构、未知协议/传输导致的发布失败；失败时保留已有内容且不新增授权。
 - 全部 Shell 文件语法检查、订阅模块及容器脚本的 ShellCheck、Python 编译、Compose 配置解析、`git diff --check` 通过。
-- Docker 守护进程未运行，未构建/启动镜像；systemd 单元只验证生成，没有在 Linux systemd 上启动。新增 Linux CI 尚未远端执行。
+- 此次订阅功能初验未启动 Docker；后续 Docker 修复的验证见 [Docker 部署](docker.md#开发验证)。systemd 单元只验证生成，没有在 Linux systemd 上启动。新增 Linux CI 尚未远端执行。
 - 公网域名/证书、Nginx/Caddy 实际配置、外部旧入口清理和客户端导入未执行，按上述部署步骤验收。

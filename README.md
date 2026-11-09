@@ -20,6 +20,8 @@
 bash <(wget -qO- https://github.com/TrekMax/v2rayNext/raw/main/install.sh)
 ```
 
+Docker 后台部署和数据持久化见 [Docker 部署](docs/docker.md)。
+
 ## 帮助
 
 ```

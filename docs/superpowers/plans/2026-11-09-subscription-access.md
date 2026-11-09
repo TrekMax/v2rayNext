@@ -61,4 +61,4 @@ Files: 修改 `README.md`、`src/help.sh`、`docs/modules.md`、`docs/architectu
 
 ## 验证结果
 
-2026-11-09：24 项本地测试、Bash 语法、针对性 ShellCheck、Python 编译、Compose 配置解析与 diff 检查通过。代码审查发现的结构错误发布和旧 Docker 包装器误调核心问题均已复现、修复并加入回归测试。Docker daemon 未运行，systemd 仅验证单元生成；远端 CI、HTTPS 与实际客户端验收未执行。修改保留在本地 feat/subscription-access 分支，未推送。
+2026-11-09：订阅功能初验时，24 项本地测试、Bash 语法、针对性 ShellCheck、Python 编译、Compose 配置解析与 diff 检查通过。代码审查发现的结构错误发布问题已复现、修复并加入回归测试。后续容器验证见 [Docker 部署](../../docker.md#开发验证)。systemd 仅验证单元生成；远端 CI、HTTPS 与实际客户端验收未执行。修改保留在本地 feat/subscription-access 分支，未推送。

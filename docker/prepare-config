@@ -1,0 +1,29 @@
+#!/bin/bash
+# Keep the CLI's existing path while persisting only data, not image scripts.
+set -e
+umask 077
+core_root=${1:-/etc/v2ray}
+config=$core_root/config.json
+state=$core_root/state
+saved=$state/config.json
+mkdir -p "$state"
+chmod 0700 "$state"
+
+validate_config() {
+    [[ -f $1 && ! -L $1 && -s $1 ]] && jq -es 'length == 1 and (.[0] | type == "object")' "$1" >/dev/null || {
+        printf 'Invalid main config: %s; refusing to replace it.\n' "$1" >&2
+        return 1
+    }
+}
+
+if [[ -e $saved || -L $saved ]]; then
+    validate_config "$saved"
+fi
+if [[ -L $config ]]; then
+    [[ $(readlink "$config") == state/config.json ]] || {
+        printf 'Unexpected config symlink: %s\n' "$config" >&2
+        exit 1
+    }
+fi
+[[ ! -e $saved ]] || chmod 0600 "$saved"
+[[ -L $config ]] || ln -s state/config.json "$config"

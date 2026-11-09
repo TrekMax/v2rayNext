@@ -6,18 +6,6 @@ subscription_python() {
     python3 "$is_sh_dir/src/subscription.py" --state-dir "$is_core_dir/subscription" "$@"
 }
 
-subscription_prepare_container() {
-    local manager
-    manager=$(command -v systemctl) || return 1
-    # Script-only upgrades leave the image's copied adapters at their old version.
-    # Refresh only this project's identifiable wrapper, never the real systemctl.
-    if [[ -f $manager ]] && grep -Fqx '# Mock systemctl for Docker environment (no systemd)' "$manager"; then
-        install -m 0755 "$is_sh_dir/docker/systemctl" "$manager" || return 1
-        install -m 0755 "$is_sh_dir/docker/entrypoint.sh" "${is_container_entrypoint:-/entrypoint.sh}" || return 1
-    fi
-    return 0
-}
-
 subscription_refresh() (
     # Isolate info()'s global variables, and keep failed output private.
     umask 077
@@ -41,7 +29,6 @@ subscription_refresh() (
 subscription_setup() {
     [[ $# -eq 1 ]] || { warn "用法: v2ray sub setup https://sub.example.com"; return 1; }
     subscription_python setup "$1" || return 1
-    subscription_prepare_container || return 1
     # Removing the previous outputs invalidates the old aliases that point here.
     rm -f -- "$is_core_dir/sub.txt" "$is_core_dir/sub-clash.yaml" || return 1
     load service.sh

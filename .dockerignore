@@ -6,6 +6,7 @@ docs
 docs/*
 !docs/subscription.md
 !docs/subscription-format.md
+!docs/docker.md
 tests
 **/__pycache__
 **/*.pyc

@@ -1,0 +1,67 @@
+#!/bin/bash
+# Core process lifecycle for containers without systemd.
+umask 077
+core_root=${V2RAY_ROOT:-/etc/v2ray}
+core_bin=$core_root/bin/v2ray
+core_logs=${V2RAY_LOG_DIR:-/var/log/v2ray}
+core_pid_file=$core_root/run/core.pid
+core_command="$core_bin run -config $core_root/config.json -confdir $core_root/conf"
+
+core_running() {
+    [[ -f $core_pid_file ]] || return 1
+    read -r core_pid <"$core_pid_file"
+    [[ $core_pid =~ ^[1-9][0-9]*$ ]] || return 1
+    kill -0 "$core_pid" 2>/dev/null || return 1
+    local process_args
+    process_args=$(ps -ww -p "$core_pid" -o args= 2>/dev/null)
+    [[ $process_args == "$core_command" || $process_args == *" $core_command" ]]
+}
+
+core_stop() {
+    if core_running; then
+        kill "$core_pid" || return 1
+        for ((attempt = 0; attempt < 30; attempt++)); do
+            core_running || break
+            sleep 0.1
+        done
+        if core_running; then
+            printf '%s\n' 'V2Ray stop timed out' >&2
+            return 1
+        fi
+    fi
+    rm -f -- "$core_pid_file"
+}
+
+core_start() {
+    core_running && return 0
+    mkdir -p "$core_root/run" "$core_logs" || return 1
+    nohup "$core_bin" run -config "$core_root/config.json" -confdir "$core_root/conf" \
+        >>"$core_logs/access.log" 2>>"$core_logs/error.log" </dev/null &
+    printf '%s\n' "$!" >"$core_pid_file"
+    sleep 0.5
+    core_running || {
+        rm -f -- "$core_pid_file"
+        printf 'V2Ray failed to start; check %s/error.log\n' "$core_logs" >&2
+        return 1
+    }
+}
+
+case $1 in
+start) core_start ;;
+stop) core_stop ;;
+restart) core_stop && core_start ;;
+is-active) core_running ;;
+enable | disable | is-enabled)
+    # The container entrypoint always starts the core. Docker manages autostart.
+    [[ $1 != disable ]]
+    ;;
+status)
+    if core_running; then
+        printf 'v2ray: active (PID %s)\n' "$core_pid"
+    else
+        printf '%s\n' 'v2ray: inactive'
+        exit 3
+    fi
+    ;;
+*) printf '%s\n' 'Unsupported V2Ray service operation' >&2; exit 1 ;;
+esac

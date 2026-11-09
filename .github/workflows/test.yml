@@ -19,9 +19,20 @@ jobs:
         run: python3 -m unittest discover -s tests -v
       - name: Shell syntax and focused lint
         run: |
-          for file in v2ray.sh src/*.sh docker/entrypoint.sh docker/systemctl docker/subscription-service; do
+          for file in v2ray.sh src/*.sh docker/*; do
             bash -n "$file"
           done
-          shellcheck -S warning src/subscription.sh docker/subscription-service docker/systemctl docker/entrypoint.sh
+          shellcheck -S warning src/subscription.sh docker/*
       - name: Diff whitespace
         run: git diff --check
+  docker:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build deployment image
+        run: docker build -t v2raynext:test .
+      - name: Container startup and persistence tests
+        env:
+          V2RAY_DOCKER_IMAGE: v2raynext:test
+        run: python3 -m unittest discover -s tests -p test_docker_integration.py -v

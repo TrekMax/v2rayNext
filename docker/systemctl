@@ -1,54 +1,19 @@
 #!/bin/bash
-# Mock systemctl for Docker environment (no systemd)
-# Manages v2ray process directly via nohup/pkill
-
-# Exact service dispatch prevents subscription operations from matching *v2ray* below.
-for service_arg in "${@:2}"; do
-    if [[ $service_arg == v2ray-subscription || $service_arg == v2ray-subscription.service ]]; then
-        subscription_scripts=${V2RAY_SCRIPT_DIR:-${V2RAY_ROOT:-/etc/v2ray}/sh}
-        exec /bin/bash "$subscription_scripts/docker/subscription-service" "$@"
-    fi
-done
-
-V2RAY_BIN=/etc/v2ray/bin/v2ray
-V2RAY_CONF=/etc/v2ray/config.json
-V2RAY_CONFDIR=/etc/v2ray/conf
-
-_v2ray_start() {
-    pkill -f "$V2RAY_BIN" 2>/dev/null
-    sleep 0.3
-    mkdir -p /var/log/v2ray
-    nohup "$V2RAY_BIN" run -config "$V2RAY_CONF" -confdir "$V2RAY_CONFDIR" \
-        >>/var/log/v2ray/access.log 2>>/var/log/v2ray/error.log &
-    sleep 0.5
-}
-
-case "$1" in
-    start)
-        [[ "$2" == *v2ray* ]] && _v2ray_start
-        ;;
-    stop)
-        [[ "$2" == *v2ray* ]] && pkill -f "$V2RAY_BIN" 2>/dev/null
-        ;;
-    restart)
-        [[ "$2" == *v2ray* ]] && _v2ray_start
-        ;;
-    status)
-        if [[ "$2" == *v2ray* ]]; then
-            if pgrep -f "$V2RAY_BIN" &>/dev/null; then
-                echo "● v2ray.service - V2Ray Service"
-                echo "   Active: active (running) since $(date)"
-            else
-                echo "● v2ray.service - V2Ray Service"
-                echo "   Active: inactive (dead)"
-            fi
-        fi
-        ;;
-    enable | disable | daemon-reload | is-enabled | is-active)
-        ;;  # noop
-    list-units)
-        ;;  # empty output — prevents caddy detection in init.sh
-    *)
-        exit 0
-        ;;
+# Service manager adapter for containers without systemd.
+# Only these two services are managed by this container.
+scripts=${V2RAY_SCRIPT_DIR:-${V2RAY_ROOT:-/etc/v2ray}/sh}
+case $1 in
+daemon-reload | list-units) exit 0 ;;
 esac
+for service_arg in "${@:2}"; do
+    case $service_arg in
+    v2ray-subscription | v2ray-subscription.service)
+        exec /bin/bash "$scripts/docker/subscription-service" "$@"
+        ;;
+    v2ray | v2ray.service)
+        exec /bin/bash "$scripts/docker/core-service" "$@"
+        ;;
+    esac
+done
+printf '%s\n' 'Unsupported container service' >&2
+exit 1
